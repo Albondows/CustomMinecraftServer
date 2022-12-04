@@ -23,7 +23,7 @@ class MinecraftServer:
         self.plugins_folder       = plugins_folder
 
         self.running              = False
-        self.server_software_name = "Rainb0wSkeppy's minecraft classic server software"
+        self.server_software_name = "Custom minecraft classic server"
 
         self.commands             = {}
         self.command_help         = {}
