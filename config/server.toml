@@ -1,0 +1,9 @@
+server.port          = 25565
+server.name          = "Rainb0wSkeppy's development server"
+server.max_players   = 20
+server.main_world    = "main"
+server.heartbeat_url = "http://classicube.net/server/heartbeat/"
+
+ranks.banned   = -20
+ranks.default  = 0
+ranks.operator = 80
