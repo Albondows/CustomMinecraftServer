@@ -1,17 +1,17 @@
 import sys
-import threading
 import logging
 
 import minecraft_server
 import player
-import packet
+import rank
 
 class ColorHandler(logging.StreamHandler):
     def __init__(self, *args, **kwargs):
+        self.mcserver = kwargs.pop("mcserver")
         super().__init__(*args, **kwargs)
     
     def emit(self, msg):
-        print(colorize(self.format(msg)))
+        print(colorize(self.mcserver.format_message(self.format(msg))))
 
 def colorize(text):
     text = text.replace("&0", "\u001b[30m")
@@ -40,18 +40,17 @@ def main():
                                               worlds_folder   ="worlds",
                                               plugins_folder  ="plugins")
 
-    server.start()
-
-    my_handler = ColorHandler()
+    my_handler = ColorHandler(mcserver=server)
     my_handler.setLevel(logging.DEBUG)
     my_handler.setFormatter(server.formatter)
 
     server.logger.addHandler(my_handler)
 
-    console_player = player.Player("(console)", None, 1 << 31)
+    server.start()
 
+    console_player = player.Player("(console)", None)
+    console_player.rank = rank.Rank( 2147483647, "Console", "&0", 2147483647, 2147483647)
     console_player.message = server.logger.info
-    
     server.used_player_ids.append(0)
 
     while server.running:
@@ -64,12 +63,13 @@ def main():
             cmdname, _, cmdargs = msg[1:].partition(" ")
 
             if cmdname in server.commands:
-                server.commands[cmdname](console_player, cmdargs)
+                server.commands[cmdname].onuse(console_player, cmdargs)
             else:
                 console_player.message(f"&cInvalid command &d{cmdname}")
         else:
             for k,v in dict(server.online_players).items():
-                v.send_packet(packet.MessagePacket(0, f"{console_player.username}: {msg}"))
+                v.message(f"&8[Console]: &f{msg}")
+            console_player.message(f"&8[Console]: &f{msg}")
                     
 
     sys.exit(0)

@@ -1,5 +1,5 @@
-from os import stat
 import struct
+import typing
 
 class InvalidPacketError(Exception):
     pass
@@ -10,536 +10,94 @@ def string_to_bytes(string):
 def bytes_to_string(string):
     return string.decode("cp437").strip()
 
-BYTE                   = "B"
+def get_size(augment: str):
+    #                     vvv adding a space because the i variable dosent contain the space that is used to separate the fields
+    #                     vvv                  vvvv removing the first character because the augment starts with '!' (network order)
+    return sum([SIZES[i + " "] for i in augment[1:].split(" ") if i])
+
+BYTE                   = "B "
 BYTE_SIZE              = 1
-SIGNED_BYTE            = "b"
+SIGNED_BYTE            = "b "
 SIGNED_BYTE_SIZE       = 1
-FIXED_POINT_BYTE       = "b"
+FIXED_POINT_BYTE       = "b "
 FIXED_POINT_BYTE_SIZE  = 1
-SHORT                  = "H" # Unused
-SHORT_SIZE             = 2
-SIGNED_SHORT           = "h"
+SIGNED_SHORT           = "h "
 SIGNED_SHORT_SIZE      = 2
-FIXED_POINT_SHORT      = "h"
+FIXED_POINT_SHORT      = "h "
 FIXED_POINT_SHORT_SIZE = 2
-INT                    = "I" # Unused
-INT_SIZE               = 4
-SIGNED_INT             = "i" # Unused
-SIGNED_INT_SIZE        = 4
-FIXED_POINT_INT        = "i" # Unused
-FIXED_POINT_INT_SIZE   = 4
-STRING                 = "64s"
+STRING                 = "64s "
 STRING_SIZE            = 64
-BYTE_ARRAY             = "1024s"
+BYTE_ARRAY             = "1024s "
 BYTE_ARRAY_SIZE        = 1024
 
+SIZES = {
+    BYTE: BYTE_SIZE,
+    SIGNED_BYTE: SIGNED_BYTE_SIZE,
+    FIXED_POINT_BYTE: FIXED_POINT_BYTE_SIZE,
+    SIGNED_SHORT: SIGNED_SHORT_SIZE,
+    FIXED_POINT_SHORT: FIXED_POINT_SHORT_SIZE,
+    STRING: STRING_SIZE,
+    BYTE_ARRAY: BYTE_ARRAY_SIZE,
+}
+
 class Packet:
-    packet_id = 0x00
+    def __init__(self, packet_id: int, augment: str):
+        self.packet_id = packet_id
+        self.augment   = "!" + augment
+        self.size      = get_size(self.augment)
 
-    def __init__(self):
-        pass
+    def to_bytes(self, *args):
+        return struct.pack(self.augment, self.packet_id, *[
+            string_to_bytes(i) if isinstance(i, str) else i
+            for i in args
+        ])
 
-    def to_bytes(self):
-        return struct.pack("B", self.packet_id)
-
-    @classmethod
-    def from_bytes(cls, data):
-        return cls()
-
-class PlayerIdentificationPacket(Packet):
-    packet_id = 0x00
-    size      = BYTE_SIZE + BYTE_SIZE + STRING_SIZE + STRING_SIZE + BYTE_SIZE
-    augment   = "!" + BYTE + BYTE + STRING + STRING + BYTE
-
-    def __init__(self, version, username, mppass, is_cpe):
-        self.version  = version
-        self.username = username
-        self.mppass   = mppass
-        self.is_cpe   = is_cpe
-
-    def to_bytes(self):
-        return struct.pack(self.augment, self.packet_id, self.version, string_to_bytes(self.username), string_to_bytes(self.mppass), self.is_cpe)
-
-    @classmethod
-    def from_bytes(cls, data):
-        if not isinstance(data, bytes):
-            raise TypeError(f"data must be bytes-like object, not {type(data)}")
-        if len(data) != cls.size:
-            raise ValueError(f"data must be {cls.size} bytes")
+    def from_bytes(self, data) -> list[typing.Any]:
+        if data[0] != self.packet_id:
+            raise InvalidPacketError(f"First byte of the packet must be {self.packet_id} but it's {data[0]}")
         
-        packet_id, version, username, mppass, is_cpe = struct.unpack(cls.augment, data)
-        username = bytes_to_string(username)
-        mppass = bytes_to_string(mppass)
-
-        if packet_id != cls.packet_id:
-            raise InvalidPacketError(f"Packet ID must be {cls.packet_id}")
-        
-        return cls(version, username, mppass, is_cpe)
-
-class ServerIdentificationPacket(Packet):
-    packet_id = 0x00
-    size      = BYTE_SIZE + BYTE_SIZE + STRING_SIZE + STRING_SIZE + BYTE_SIZE
-    augment   = "!" + BYTE + BYTE + STRING + STRING + BYTE
-
-    def __init__(self, version, name, motd, is_op):
-        self.version = version
-        self.name    = name
-        self.motd    = motd
-        self.is_op   = is_op
-
-    def to_bytes(self):
-        return struct.pack(self.augment, self.packet_id, self.version, string_to_bytes(self.name), string_to_bytes(self.motd), self.is_op)
-
-    @classmethod
-    def from_bytes(cls, data):
-        if not isinstance(data, bytes):
-            raise TypeError(f"data must be bytes-like object, not {type(data)}")
-        if len(data) != cls.size:
-            raise ValueError(f"data must be {cls.size} bytes")
-        
-        packet_id, version, name, motd, is_op = struct.unpack(cls.augment, data)
-        name = bytes_to_string(name)
-        key  = bytes_to_string(key)
-
-        if packet_id != cls.packet_id:
-            raise InvalidPacketError(f"Packet ID must be {cls.packet_id}")
-        
-        return cls(version, name, motd, is_op)
-
-class PingPacket(Packet):
-    packet_id = 0x01
-    size      = BYTE_SIZE
-    augment   = "!" + BYTE
-
-    def __init__(self):
-        pass
-
-    def to_bytes(self):
-        return struct.pack(self.augment, self.packet_id)
-
-    @classmethod
-    def from_bytes(cls, data):
-        if not isinstance(data, bytes):
-            raise TypeError(f"data must be bytes-like object, not {type(data)}")
-        if len(data) != cls.size:
-            raise ValueError(f"data must be {cls.size} bytes")
-        
-        packet_id = struct.unpack(cls.augment, data)[0] # [0] bc struct.unpack returns a list even if theres only 1 
-
-        if packet_id != cls.packet_id:
-            raise InvalidPacketError(f"Packet ID must be {cls.packet_id}")
-        
-        return cls()
-
-class LevelInitilizePacket(Packet):
-    packet_id = 0x02
-    size      = BYTE_SIZE
-    augment   = "!" + BYTE
-
-    def __init__(self):
-        pass
-
-    def to_bytes(self):
-        return struct.pack(self.augment, self.packet_id)
-
-    @classmethod
-    def from_bytes(cls, data):
-        if not isinstance(data, bytes):
-            raise TypeError(f"data must be bytes-like object, not {type(data)}")
-        if len(data) != cls.size:
-            raise ValueError(f"data must be {cls.size} bytes")
-        
-        packet_id = struct.unpack(cls.augment, data)
-
-        if packet_id != cls.packet_id:  
-            raise InvalidPacketError(f"Packet ID must be {cls.packet_id}")
-        
-        return cls()
-
-class LevelDataChunkPacket(Packet):
-    packet_id = 0x03
-    size      = BYTE_SIZE + SIGNED_SHORT_SIZE + BYTE_ARRAY_SIZE + BYTE_SIZE
-    augment   = "!" + BYTE + SIGNED_SHORT + BYTE_ARRAY + BYTE
-
-    def __init__(self, length, data, percent):
-        self.length  = length
-        self.data    = data
-        self.percent = percent
-
-    def to_bytes(self):
-        return struct.pack(self.augment, self.packet_id, self.length, self.data + (b"\x00" * (1024 - len(self.data))), self.percent)
-
-    @classmethod
-    def from_bytes(cls, data):
-        if not isinstance(data, bytes):
-            raise TypeError(f"data must be bytes-like object, not {type(data)}")
-        if len(data) != cls.size:
-            raise ValueError(f"data must be {cls.size} bytes")
-        
-        packet_id, length, data, percent = struct.unpack(cls.augment, data)
-
-        if packet_id != cls.packet_id:
-            raise InvalidPacketError(f"Packet ID must be {cls.packet_id}")
-        
-        return cls(length, data, percent)
-
-class LevelFinalizePacket(Packet):
-    packet_id = 0x04
-    size      = BYTE_SIZE + SIGNED_SHORT_SIZE + SIGNED_SHORT_SIZE + SIGNED_SHORT_SIZE
-    augment   = "!" + BYTE + SIGNED_SHORT + SIGNED_SHORT + SIGNED_SHORT
-
-    def __init__(self, width, height, length):
-        self.width  = width
-        self.height = height
-        self.length = length
-
-    def to_bytes(self):
-        return struct.pack(self.augment, self.packet_id, self.width, self.height, self.length)
-
-    @classmethod
-    def from_bytes(cls, data):
-        if not isinstance(data, bytes):
-            raise TypeError(f"data must be bytes-like object, not {type(data)}")
-        if len(data) != cls.size:
-            raise ValueError(f"data must be {cls.size} bytes")
-        
-        packet_id, width, height, length = struct.unpack(cls.augment, data)
-
-        if packet_id != cls.packet_id:
-            raise InvalidPacketError(f"Packet ID must be {cls.packet_id}")
-        
-        return cls(width, height, length)
-
-class ClientSetBlockPacket(Packet):
-    packet_id = 0x05
-    size      = BYTE_SIZE + SIGNED_SHORT_SIZE + SIGNED_SHORT_SIZE + SIGNED_SHORT_SIZE + BYTE_SIZE + BYTE_SIZE
-    augment   = "!" + BYTE + SIGNED_SHORT + SIGNED_SHORT + SIGNED_SHORT + BYTE + BYTE
-
-    def __init__(self, x, y, z, mode, block):
-        self.x     = x
-        self.y     = y
-        self.z     = z
-        self.mode  = mode
-        self.block = block
-
-    def to_bytes(self):
-        return struct.pack(self.augment, self.packet_id, self.x, self.y, self.z, self.mode, self.block)
-
-    @classmethod
-    def from_bytes(cls, data):
-        if not isinstance(data, bytes):
-            raise TypeError(f"data must be bytes-like object, not {type(data)}")
-        if len(data) != cls.size:
-            raise ValueError(f"data must be {cls.size} bytes")
-        
-        packet_id, x, y, z, mode, block = struct.unpack(cls.augment, data)
-
-        if packet_id != cls.packet_id:
-            raise InvalidPacketError(f"Packet ID must be {cls.packet_id}")
-        
-        return cls(x, y, z, mode, block)
-
-class ServerSetBlockPacket(Packet):
-    packet_id = 0x06
-    size      = BYTE_SIZE + SIGNED_SHORT_SIZE + SIGNED_SHORT_SIZE + SIGNED_SHORT_SIZE + BYTE_SIZE
-    augment   = "!" + BYTE + SIGNED_SHORT + SIGNED_SHORT + SIGNED_SHORT + BYTE
-
-    def __init__(self, x, y, z, block):
-        self.x     = x
-        self.y     = y
-        self.z     = z
-        self.block = block
-
-    def to_bytes(self):
-        return struct.pack(self.augment, self.packet_id, self.x, self.y, self.z, self.block)
-
-    @classmethod
-    def from_bytes(cls, data):
-        if not isinstance(data, bytes):
-            raise TypeError(f"data must be bytes-like object, not {type(data)}")
-        if len(data) != cls.size:
-            raise ValueError(f"data must be {cls.size} bytes")
-        
-        packet_id, x, y, z, block = struct.unpack(cls.augment, data)
-
-        if packet_id != cls.packet_id:
-            raise InvalidPacketError(f"Packet ID must be {cls.packet_id}")
-        
-        return cls(x, y, z, block)
-
-class SpawnPlayerPacket(Packet):
-    packet_id = 0x07
-    size      = BYTE_SIZE + BYTE_SIZE + STRING_SIZE + SIGNED_SHORT_SIZE + SIGNED_SHORT_SIZE + SIGNED_SHORT_SIZE + BYTE_SIZE + BYTE_SIZE
-    augment   = "!" + BYTE + BYTE + STRING + SIGNED_SHORT + SIGNED_SHORT + SIGNED_SHORT + BYTE + BYTE
-
-    def __init__(self, player_id, username, x, y, z, pitch, yaw):
-        self.player_id = player_id
-        self.username  = username
-        self.x         = x
-        self.y         = y
-        self.z         = z
-        self.pitch     = pitch
-        self.yaw       = yaw
-
-    def to_bytes(self):
-        return struct.pack(self.augment, self.packet_id, self.player_id, string_to_bytes(self.username), self.x, self.y, self.z, self.pitch, self.yaw)
-
-    @classmethod
-    def from_bytes(cls, data):
-        if not isinstance(data, bytes):
-            raise TypeError(f"data must be bytes-like object, not {type(data)}")
-        if len(data) != cls.size:
-            raise ValueError(f"data must be {cls.size} bytes")
-        
-        packet_id, player_id, username, x, y, z, pitch, yaw = struct.unpack(cls.augment, data)
-
-        username = bytes_to_string(username)
-
-        if packet_id != cls.packet_id:
-            raise InvalidPacketError(f"Packet ID must be {cls.packet_id}")
-        
-        return cls(player_id, username, x, y, z, pitch, yaw)
-
-class PositionOrientationPacket(Packet):
-    packet_id = 0x08
-    size      = BYTE_SIZE + BYTE_SIZE + SIGNED_SHORT_SIZE + SIGNED_SHORT_SIZE + SIGNED_SHORT_SIZE + BYTE_SIZE + BYTE_SIZE
-    augment   = "!" + BYTE + BYTE + SIGNED_SHORT + SIGNED_SHORT + SIGNED_SHORT + BYTE + BYTE
-
-    def __init__(self, player_id, x, y, z, pitch, yaw):
-        self.player_id = player_id
-        self.x         = x
-        self.y         = y
-        self.z         = z
-        self.pitch     = pitch
-        self.yaw       = yaw
-
-    def to_bytes(self):
-        return struct.pack(self.augment, self.packet_id, self.player_id, self.x, self.y, self.z, self.pitch, self.yaw)
-
-    @classmethod
-    def from_bytes(cls, data):
-        if not isinstance(data, bytes):
-            raise TypeError(f"data must be bytes-like object, not {type(data)}")
-        if len(data) != cls.size:
-            raise ValueError(f"data must be {cls.size} bytes")
-        
-        packet_id, player_id, x, y, z, pitch, yaw = struct.unpack(cls.augment, data)
-
-        if packet_id != cls.packet_id:
-            raise InvalidPacketError(f"Packet ID must be {cls.packet_id}")
-        
-        return cls(player_id, x, y, z, pitch, yaw)
-
-class RelativePositionOrientationPacket(Packet):
-    packet_id = 0x09
-    size      = BYTE_SIZE + BYTE_SIZE + BYTE_SIZE + BYTE_SIZE + BYTE_SIZE + BYTE_SIZE + BYTE_SIZE
-    augment   = "!" + BYTE + BYTE + BYTE + BYTE + BYTE + BYTE + BYTE
-
-    def __init__(self, player_id, x, y, z, pitch, yaw):
-        self.player_id = player_id
-        self.x         = x
-        self.y         = y
-        self.z         = z
-        self.pitch     = pitch
-        self.yaw       = yaw
-
-    def to_bytes(self):
-        return struct.pack(self.augment, self.packet_id, self.player_id, self.x, self.y, self.z, self.pitch, self.yaw)
-
-    @classmethod
-    def from_bytes(cls, data):
-        if not isinstance(data, bytes):
-            raise TypeError(f"data must be bytes-like object, not {type(data)}")
-        if len(data) != cls.size:
-            raise ValueError(f"data must be {cls.size} bytes")
-        
-        packet_id, player_id, x, y, z, pitch, yaw = struct.unpack(cls.augment, data)
-
-        if packet_id != cls.packet_id:
-            raise InvalidPacketError(f"Packet ID must be {cls.packet_id}")
-        
-        return cls(player_id, x, y, z, pitch, yaw)
-
-class RelativePositionPacket(Packet):
-    packet_id = 0x0a
-    size      = BYTE_SIZE + BYTE_SIZE + BYTE_SIZE + BYTE_SIZE + BYTE_SIZE
-    augment   = "!" + BYTE + BYTE + BYTE + BYTE + BYTE + BYTE + BYTE
-
-    def __init__(self, player_id, x, y, z):
-        self.player_id = player_id
-        self.x         = x
-        self.y         = y
-        self.z         = z
-
-    def to_bytes(self):
-        return struct.pack(self.augment, self.packet_id, self.player_id, self.x, self.y, self.z)
-
-    @classmethod
-    def from_bytes(cls, data):
-        if not isinstance(data, bytes):
-            raise TypeError(f"data must be bytes-like object, not {type(data)}")
-        if len(data) != cls.size:
-            raise ValueError(f"data must be {cls.size} bytes")
-        
-        packet_id, player_id, x, y, z = struct.unpack(cls.augment, data)
-
-        if packet_id != cls.packet_id:
-            raise InvalidPacketError(f"Packet ID must be {cls.packet_id}")
-        
-        return cls(player_id, x, y, z)
-
-class RelativeOrientationPacket(Packet):
-    packet_id = 0x0b
-    size      = BYTE_SIZE + BYTE_SIZE + BYTE_SIZE + BYTE_SIZE
-    augment   = "!" + BYTE + BYTE + BYTE + BYTE
-
-    def __init__(self, player_id, pitch, yaw):
-        self.player_id = player_id
-        self.pitch     = pitch
-        self.yaw       = yaw
-
-    def to_bytes(self):
-        return struct.pack(self.augment, self.packet_id, self.player_id, self.pitch, self.yaw)
-
-    @classmethod
-    def from_bytes(cls, data):
-        if not isinstance(data, bytes):
-            raise TypeError(f"data must be bytes-like object, not {type(data)}")
-        if len(data) != cls.size:
-            raise ValueError(f"data must be {cls.size} bytes")
-        
-        packet_id, player_id, pitch, yaw = struct.unpack(cls.augment, data)
-
-        if packet_id != cls.packet_id:
-            raise InvalidPacketError(f"Packet ID must be {cls.packet_id}")
-        
-        return cls(player_id, pitch, yaw)
-
-class DespawnPlayerPacket(Packet):
-    packet_id = 0x0c
-    size      = BYTE_SIZE + BYTE_SIZE
-    augment   = "!" + BYTE + BYTE
-
-    def __init__(self, player_id):
-        self.player_id = player_id
-
-    def to_bytes(self):
-        return struct.pack(self.augment, self.packet_id, self.player_id)
-
-    @classmethod
-    def from_bytes(cls, data):
-        if not isinstance(data, bytes):
-            raise TypeError(f"data must be bytes-like object, not {type(data)}")
-        if len(data) != cls.size:
-            raise ValueError(f"data must be {cls.size} bytes")
-        
-        packet_id, player_id = struct.unpack(cls.augment, data)
-
-        if packet_id != cls.packet_id:
-            raise InvalidPacketError(f"Packet ID must be {cls.packet_id}")
-        
-        return cls(player_id)
-    
-class MessagePacket(Packet):
-    packet_id = 0x0d
-    size      = BYTE_SIZE + BYTE_SIZE + STRING_SIZE
-    augment   = "!" + BYTE + BYTE + STRING
-
-    def __init__(self, player_id, message):
-        self.player_id = player_id
-        self.message   = message
-
-    def to_bytes(self):
-        return struct.pack(self.augment, self.packet_id, self.player_id, string_to_bytes(self.message))
-
-    @classmethod
-    def from_bytes(cls, data):
-        if not isinstance(data, bytes):
-            raise TypeError(f"data must be bytes-like object, not {type(data)}")
-        if len(data) != cls.size:
-            raise ValueError(f"data must be {cls.size} bytes")
-        
-        packet_id, player_id, message = struct.unpack(cls.augment, data)
-
-        message = bytes_to_string(message)
-
-        if packet_id != cls.packet_id:
-            raise InvalidPacketError(f"Packet ID must be {cls.packet_id}")
-        
-        return cls(player_id, message)
-
-class DisconnectPacket(Packet):
-    packet_id = 0x0e
-    size      = BYTE_SIZE + STRING_SIZE
-    augment   = "!" + BYTE + STRING
-
-    def __init__(self, reason):
-        self.reason   = reason
-
-    def to_bytes(self):
-        return struct.pack(self.augment, self.packet_id, string_to_bytes(self.reason))
-
-    @classmethod
-    def from_bytes(cls, data):
-        if not isinstance(data, bytes):
-            raise TypeError(f"data must be bytes-like object, not {type(data)}")
-        if len(data) != cls.size:
-            raise ValueError(f"data must be {cls.size} bytes")
-        
-        packet_id, reason = struct.unpack(cls.augment, data)
-
-        reason = bytes_to_string(reason)
-
-        if packet_id != cls.packet_id:
-            raise InvalidPacketError(f"Packet ID must be {cls.packet_id}")
-        
-        return cls(reason)
-
-class ChangePlayerTypePacket(Packet):
-    packet_id = 0x0f
-    size      = BYTE_SIZE + BYTE_SIZE
-    augment   = "!" + BYTE + BYTE
-
-    def __init__(self, new_type):
-        self.new_type = new_type
-
-    def to_bytes(self):
-        return struct.pack(self.augment, self.packet_id, self.new_type)
-
-    @classmethod
-    def from_bytes(cls, data):
-        if not isinstance(data, bytes):
-            raise TypeError(f"data must be bytes-like object, not {type(data)}")
-        if len(data) != cls.size:
-            raise ValueError(f"data must be {cls.size} bytes")
-        
-        packet_id, new_type = struct.unpack(cls.augment, data)
-
-        if packet_id != cls.packet_id:
-            raise InvalidPacketError(f"Packet ID must be {cls.packet_id}")
-        
-        return cls(new_type)
+        return [bytes_to_string(i) if isinstance(i, bytes) and len(i) == 64 else i
+                for i in struct.unpack(self.augment, data)]
+
+player_identification_packet         = Packet(packet_id=0x00, augment=BYTE + BYTE + STRING + STRING + BYTE)
+server_identification_packet         = Packet(packet_id=0x00, augment=BYTE + BYTE + STRING + STRING + BYTE)
+ping_packet                          = Packet(packet_id=0x01, augment=BYTE)
+level_initilize_packet               = Packet(packet_id=0x02, augment=BYTE)
+level_data_chunk_packet              = Packet(packet_id=0x03, augment=BYTE + SIGNED_SHORT + BYTE_ARRAY + BYTE)
+level_finalize_packet                = Packet(packet_id=0x04, augment=BYTE + SIGNED_SHORT + SIGNED_SHORT + SIGNED_SHORT)
+client_set_block_packet              = Packet(packet_id=0x05, augment=BYTE + SIGNED_SHORT + SIGNED_SHORT + SIGNED_SHORT + BYTE + BYTE)
+server_set_block_packet              = Packet(packet_id=0x06, augment=BYTE + SIGNED_SHORT + SIGNED_SHORT + SIGNED_SHORT + BYTE)
+spawn_player_packet                  = Packet(packet_id=0x07, augment=BYTE + BYTE + STRING + SIGNED_SHORT + SIGNED_SHORT + SIGNED_SHORT + BYTE + BYTE)
+position_orientation_packet          = Packet(packet_id=0x08, augment=BYTE + BYTE + SIGNED_SHORT + SIGNED_SHORT + SIGNED_SHORT + BYTE + BYTE)
+relative_position_orientation_packet = Packet(packet_id=0x09, augment=BYTE + BYTE + BYTE + BYTE + BYTE + BYTE + BYTE)
+relative_position_packet             = Packet(packet_id=0x0a, augment=BYTE + BYTE + BYTE + BYTE + BYTE + BYTE + BYTE)
+relative_orientation_packet          = Packet(packet_id=0x0b, augment=BYTE + BYTE + BYTE + BYTE)
+despawn_player_packet                = Packet(packet_id=0x0c, augment=BYTE + BYTE)  
+message_packet                       = Packet(packet_id=0x0d, augment=BYTE + BYTE + STRING)
+disconnect_packet                    = Packet(packet_id=0x0e, augment=BYTE + STRING)
+change_player_type_packet            = Packet(packet_id=0x0f, augment=BYTE + BYTE)
 
 client_packets = {
-    0x00: PlayerIdentificationPacket,
-    0x05: ClientSetBlockPacket,
-    0x08: PositionOrientationPacket,
-    0x0d: MessagePacket,
+    0x00: player_identification_packet,
+    0x05: client_set_block_packet,
+    0x08: position_orientation_packet,
+    0x0d: message_packet,
 }
 
 server_packets = {
-    0x00: ServerIdentificationPacket,
-    0x01: PingPacket,
-    0x02: LevelInitilizePacket,
-    0x03: LevelDataChunkPacket,
-    0x04: LevelFinalizePacket,
-    0x06: ServerSetBlockPacket,
-    0x07: SpawnPlayerPacket,
-    0x08: PositionOrientationPacket,
-    0x09: RelativePositionOrientationPacket,
-    0x0a: RelativePositionPacket,
-    0x0b: RelativeOrientationPacket,
-    0x0c: DespawnPlayerPacket,
-    0x0d: MessagePacket,
-    0x0f: ChangePlayerTypePacket,
+    0x00: server_identification_packet,
+    0x01: ping_packet,
+    0x02: level_initilize_packet,
+    0x03: level_data_chunk_packet,
+    0x04: level_finalize_packet,
+    0x06: server_set_block_packet,
+    0x07: spawn_player_packet,
+    0x08: position_orientation_packet,
+    0x09: relative_position_orientation_packet,
+    0x0a: relative_position_packet,
+    0x0b: relative_orientation_packet,
+    0x0c: despawn_player_packet,
+    0x0d: message_packet,
+    0x0e: disconnect_packet,
+    0x0f: change_player_type_packet,
 }

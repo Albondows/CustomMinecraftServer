@@ -1,0 +1,41 @@
+banned.name = "Banned"
+banned.color = "&0"
+banned.rank = -100
+banned.max_draw = 0
+banned.max_maps = 0
+
+guest.name = "Guest"
+guest.color = "&7"
+guest.rank = 0
+guest.max_draw = 1
+guest.max_maps = 1
+
+builder.name = "Builder"
+builder.color = "&3"
+builder.rank = 25
+builder.max_draw = 4096
+builder.max_maps = 3
+
+advbuilder.name = "AdvBuilder"
+advbuilder.color = "&b"
+advbuilder.rank = 50
+advbuilder.max_draw = 524288
+advbuilder.max_maps = 5
+
+operator.name = "Operator"
+operator.color = "&6"
+operator.rank = 100
+operator.max_draw = 4194304
+operator.max_maps = 15
+
+superop.name = "SuperOp"
+superop.color = "&e"
+superop.rank = 150
+superop.max_draw = 16777216
+superop.max_maps = 50
+
+nobody.name = "Nobody"
+nobody.color = "&d"
+nobody.rank = 1000
+nobody.max_draw = 134217728
+nobody.max_maps = 100

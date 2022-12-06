@@ -1,9 +1,40 @@
-server.port          = 25565
-server.name          = "Rainb0wSkeppy's development server"
-server.max_players   = 20
-server.main_world    = "main"
-server.heartbeat_url = "http://classicube.net/server/heartbeat/"
+server.port               = 25565
+server.name               = "Rainb0wSkeppy's development server"
+server.max_players        = 20
+server.main_world         = "main"
+server.heartbeat_url      = "http://classicube.net/heartbeat.jsp"
 
 ranks.banned   = -20
 ranks.default  = 0
 ranks.operator = 80
+
+colors.message   = "&f" # §msg
+colors.default   = "&e" # §dft
+colors.commands  = "&d" # §cmd
+colors.names     = "&d" # §nms
+colors.errors    = "&c" # §err
+colors.arguments = "&b" # §arg
+
+# These will be replaced with the reciever's information, not the sender's
+# player name           ← §nme
+# player nick           ← §nck
+# player color          ← §clr
+# player login message  ← §lim
+# player logout message ← §lom
+# player rank name      ← §rnm
+# player rank color     ← §rcl
+# player rank number    ← §rnb
+
+# These will  be replaced with the sender's information, not the reciever's but only sometimes work
+# player name           ← §snm
+# player nick           ← §snk
+# player color          ← §scl
+# player login message  ← §sli
+# player logout message ← §slo
+# player rank name      ← §srn
+# player rank color     ← §src
+# player rank number    ← §srb
+
+player.connect_message    = "&a+ §src[§srn] §snk§msg connected"
+player.disconnect_message = "&c- §src[§srn] §snk§msg disconnected"
+player.message_format     = "§src[§srn] §snk: §msg%msg%"
